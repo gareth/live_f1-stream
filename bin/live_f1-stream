@@ -1,3 +1,87 @@
 #!/usr/bin/env ruby
+require 'optparse'
+require 'highline'
 
-require 'live_f1-stream'
+require 'live_f1'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{File.basename($0)} [options] [logfile]"
+
+  opts.separator ""
+  opts.separator "Options:"
+
+  opts.on("-d", "--debug", "Displays bit data from each output data packet's header") do
+    LiveF1.debug = true
+  end
+  opts.on("-h", "--help", "Shows this message") do
+    puts opts
+    exit
+  end
+
+  opts.separator ""
+  opts.separator "Supplying a [logfile] will play its data back"
+  opts.separator "Logfile options:"
+  opts.on("-x", "--replay-speed=SPEED", Integer, "Specifies the playback speed as a multiplier (default: 1)") do |speed|
+    options[:speed] = speed
+  end
+
+  opts.separator ""
+  opts.separator "Omitting [logfile] will trigger a live connection"
+  opts.separator "Live connection options:"
+
+  opts.on("-u USERNAME", "--username", "Specifies a formula1.com live timing username") do |username|
+    options[:username] = username
+  end
+  opts.on("-p [PASSWORD]", "--password", "Specifies a formula1.com live timing password. Omitting the password will cause live-f1 to prompt for it.") do |password|
+    unless password
+      prompt = HighLine.new
+      password = prompt.ask("Password: ") { |q| q.echo = false }
+    end
+    options[:password] = password
+  end
+  opts.on("-l LOG_DIRECTORY", "--log-dir", "Specifies a directory to save the streamed data into") do |log_dir|
+    options[:log_dir] = log_dir
+  end
+
+end.parse!
+
+if logfile = ARGV.shift
+
+  timestamp = nil
+  packets = []
+
+  speed = (options[:speed] || 1)
+
+  source = LiveF1::Source::Log.new(File.open(logfile))
+  source.run do |packet|
+    packets << packet
+    case packet
+    when LiveF1::Packet::Sys::Timestamp
+      t_start = timestamp || packet.number
+      t_end = packet.number
+      t_diff = t_end - t_start
+      interval = t_diff.to_f / (packets.length) / speed unless speed.zero?
+
+      # The interval is the difference in time between the last 2 timestamps, divided
+      # by the number of packets between the timestamps. This is then divided again to
+      # speed up the replay
+      packets.pop # Remove the timestamp packet from the output queue
+      while p = packets.shift
+        puts p.inspect
+        sleep interval if interval && interval > 0
+      end
+      timestamp = packet.number
+    end
+  end
+
+else
+
+  source = LiveF1::Source::Live.new(options[:username], options[:password])
+  source.log_dir = options[:log_dir] if options[:log_dir]
+  source.run do |packet|
+    puts packet.inspect
+  end
+
+end
+

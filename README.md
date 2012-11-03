@@ -1,24 +1,25 @@
 # LiveF1::Stream
 
-TODO: Write a gem description
+TODO: Provides an executable interface to the live_f1-core gem
 
 ## Installation
 
 Add this line to your application's Gemfile:
 
-    gem 'live_f1-stream'
+    gem 'live_f1-stream', :git => "https://github.com/gareth/live_f1-stream.git"
 
 And then execute:
 
     $ bundle
 
-Or install it yourself as:
+Or install it yourself by cloning/downloading the source and:
 
+    $ gem build live_f1-stream.gemspec
     $ gem install live_f1-stream
 
 ## Usage
 
-TODO: Write usage instructions here
+See `live_f1-stream -h` for available options
 
 ## Contributing
 
